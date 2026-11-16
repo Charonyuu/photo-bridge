@@ -11,7 +11,7 @@ const { execFile } = require('child_process');
 const QRCode = require('qrcode');
 const { Store, hashFile } = require('./store');
 
-const VERSION = '0.1.0';
+const VERSION = '0.1.1';
 
 function configDir() {
   if (process.env.PHOTOBRIDGE_CONFIG_DIR) return process.env.PHOTOBRIDGE_CONFIG_DIR;
@@ -77,6 +77,7 @@ class App {
     await fsp.writeFile(probe, 'ok');
     await fsp.rm(probe);
     if (this.uploadsInFlight.size) throw new Error('傳輸中不能換資料夾');
+    if (this.store) await this.store.close();
     this.store = await new Store(abs).open();
     this.cfg.backupDir = abs;
     await this.saveCfg();
@@ -238,6 +239,7 @@ class App {
     if (p === '/ui/state') {
       return send(res, 200, {
         version: VERSION, name: this.cfg.name, port: this.port, hosts: lanAddresses(),
+        suggest: path.join(os.homedir(), 'Pictures', 'iPhone備份'),
         backupDir: this.store ? this.store.root : null,
         stored: this.store ? { count: this.store.count, bytes: this.store.totalBytes } : null,
         inFlight: [...this.uploadsInFlight.values()],
@@ -252,12 +254,18 @@ class App {
       return res.end(svg);
     }
     if (p === '/ui/pair-url') return send(res, 200, { url: this.pairUrl() });
+    if (p === '/ui/ls') {
+      try { return send(res, 200, await listDir(url.searchParams.get('path') || '')); }
+      catch (e) { return send(res, 400, { error: `打不開這個資料夾：${e.message}` }); }
+    }
     if (req.method !== 'POST') return send(res, 405, { error: 'POST only' });
-    if (p === '/ui/pick-folder') {
-      const dir = await pickFolder();
-      if (!dir) return send(res, 200, { cancelled: true });
-      await this.setBackupDir(dir);
-      return send(res, 200, { backupDir: this.store.root });
+    if (p === '/ui/mkdir') {
+      const body = await readJson(req, 64 * 1024);
+      const name = String(body.name || '').trim();
+      if (!name || /[<>:"/\\|?*]/.test(name)) return send(res, 400, { error: '資料夾名稱不能有 < > : " / \\ | ? *' });
+      const full = path.join(path.resolve(String(body.parent || '')), name);
+      await fsp.mkdir(full, { recursive: true });
+      return send(res, 200, { path: full });
     }
     if (p === '/ui/set-folder') {
       const body = await readJson(req, 64 * 1024);
@@ -408,21 +416,37 @@ function labelOf(s) { return { icloud: '只在 iCloud', failed: '失敗', pendin
 function csvCell(v) { const s = String(v ?? ''); return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; }
 function stripProblems(r) { const { problems, ...rest } = r; return { ...rest, problemCount: (problems || []).length }; }
 
-function pickFolder() {
-  return new Promise((resolve) => {
+// 網頁內的資料夾瀏覽：列出磁碟／子資料夾（不靠 Windows 對話框，避免視窗被藏到後面）
+async function listDir(dir) {
+  const home = os.homedir();
+  const quick = [
+    { label: '圖片', path: path.join(home, 'Pictures') },
+    { label: '文件', path: path.join(home, 'Documents') },
+    { label: '桌面', path: path.join(home, 'Desktop') },
+  ].filter((q) => fs.existsSync(q.path));
+  if (!dir) {
+    const roots = [];
     if (process.platform === 'win32') {
-      const ps = [
-        'Add-Type -AssemblyName System.Windows.Forms;',
-        '$f = New-Object System.Windows.Forms.Form; $f.TopMost = $true;',
-        '$d = New-Object System.Windows.Forms.FolderBrowserDialog;',
-        '$d.Description = "選擇照片備份要放的資料夾"; $d.ShowNewFolderButton = $true;',
-        'if ($d.ShowDialog($f) -eq "OK") { [Console]::OutputEncoding = [Text.Encoding]::UTF8; Write-Output $d.SelectedPath }',
-      ].join(' ');
-      execFile('powershell.exe', ['-NoProfile', '-STA', '-Command', ps], { windowsHide: true }, (err, out) => resolve(err ? null : out.trim() || null));
-    } else if (process.platform === 'darwin') {
-      execFile('osascript', ['-e', 'POSIX path of (choose folder with prompt "選擇照片備份要放的資料夾")'], (err, out) => resolve(err ? null : out.trim() || null));
-    } else resolve(null);
-  });
+      for (const L of 'CDEFGHIJKLMNOPQRSTUVWXYZ') {
+        const d = `${L}:\\`;
+        if (fs.existsSync(d)) roots.push({ name: `${L}:`, path: d });
+      }
+    } else {
+      roots.push({ name: '家目錄', path: home });
+      if (fs.existsSync('/Volumes')) {
+        for (const v of await fsp.readdir('/Volumes').catch(() => [])) roots.push({ name: v, path: path.join('/Volumes', v) });
+      }
+    }
+    return { path: '', parent: null, dirs: roots, quick };
+  }
+  const abs = path.resolve(dir);
+  const entries = await fsp.readdir(abs, { withFileTypes: true });
+  const dirs = entries
+    .filter((e) => e.isDirectory() && !/^[.$]/.test(e.name) && !/^(System Volume Information|Windows|Program Files.*|ProgramData|AppData)$/i.test(e.name))
+    .map((e) => ({ name: e.name, path: path.join(abs, e.name) }))
+    .sort((a, b) => a.name.localeCompare(b.name, 'zh-Hant'));
+  const parent = path.dirname(abs);
+  return { path: abs, parent: parent === abs ? '' : parent, dirs, quick };
 }
 
 function openPath(p) {

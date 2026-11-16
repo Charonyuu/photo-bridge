@@ -19,7 +19,7 @@ async function start() {
   base = `http://127.0.0.1:${app.port}`;
   token = app.cfg.token;
 }
-async function stop() { await new Promise((r) => app.server.close(r)); }
+async function stop() { await new Promise((r) => app.server.close(r)); if (app.store) await app.store.close(); }
 
 async function api(p, opts = {}) {
   const r = await fetch(base + p, { ...opts, headers: { 'x-token': token, 'content-type': 'application/json', ...(opts.headers || {}) } });

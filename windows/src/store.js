@@ -37,6 +37,11 @@ class Store {
     return this;
   }
 
+  async close() {
+    await this.writeChain;
+    if (this.indexFh) { await this.indexFh.sync().catch(() => {}); await this.indexFh.close(); this.indexFh = null; }
+  }
+
   get count() { return this.entries.size; }
 
   get totalBytes() {
@@ -50,14 +55,10 @@ class Store {
 
   append(rec) {
     // 串起來寫，避免並行上傳時兩行交錯
+    // 索引檔一直開著，不每筆 fsync（檔案本身收完已 fsync；索引萬一少一行，重傳時會用同名同雜湊直接沿用）
     this.writeChain = this.writeChain.then(async () => {
-      const fh = await fsp.open(this.indexPath, 'a');
-      try {
-        await fh.write(JSON.stringify(rec) + '\n');
-        await fh.sync();
-      } finally {
-        await fh.close();
-      }
+      if (!this.indexFh) this.indexFh = await fsp.open(this.indexPath, 'a');
+      await this.indexFh.write(JSON.stringify(rec) + '\n');
     });
     return this.writeChain;
   }

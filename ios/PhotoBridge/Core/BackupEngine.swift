@@ -57,11 +57,15 @@ final class BackupEngine: ObservableObject {
     @Published var problems: [Problem] = []
     @Published var limitedAccess = false
     @Published var lastRun: LastRun? = LastRunStore.load()
+    /// 也從 iCloud 下載手機上沒有的原始檔
+    @Published var includeICloud = UserDefaults.standard.bool(forKey: "includeICloud") {
+        didSet { UserDefaults.standard.set(includeICloud, forKey: "includeICloud") }
+    }
 
     private var task: Task<Void, Never>?
     private var bgTask: UIBackgroundTaskIdentifier = .invalid
     private let batchSize = 200
-    private let concurrency = 2
+    private let concurrency = 4
 
     var isBusy: Bool { phase == .connecting || phase == .running || phase == .stopping }
 
@@ -78,6 +82,7 @@ final class BackupEngine: ObservableObject {
 
     private func run(pairing: Pairing) async {
         phase = .connecting
+        let allowICloud = includeICloud
         summary = Summary(); processed = 0; uploadedFiles = 0; skippedFiles = 0; bytesSent = 0
         problems = []; current = ""
 
@@ -132,7 +137,7 @@ final class BackupEngine: ObservableObject {
                     var it = entries.makeIterator()
                     func addNext() -> Bool {
                         guard let e = it.next() else { return false }
-                        group.addTask { [weak self] in try await self?.process(e, have: have, client: client, tmpDir: tmpDir) }
+                        group.addTask { [weak self] in try await self?.process(e, have: have, client: client, tmpDir: tmpDir, allowICloud: allowICloud) }
                         return true
                     }
                     for _ in 0..<concurrency { if !addNext() { break } }
@@ -163,7 +168,7 @@ final class BackupEngine: ObservableObject {
     }
 
     /// 處理一個照片／影片項目：傳它所有還沒在電腦上的原始檔
-    nonisolated private func process(_ entry: AssetEntry, have: Set<String>, client: ReceiverClient, tmpDir: URL) async throws {
+    nonisolated private func process(_ entry: AssetEntry, have: Set<String>, client: ReceiverClient, tmpDir: URL, allowICloud: Bool) async throws {
         if entry.resources.isEmpty {
             await record(entry, .failed("找不到原始檔"))
             return
@@ -178,7 +183,11 @@ final class BackupEngine: ObservableObject {
             let tmp = tmpDir.appendingPathComponent(UUID().uuidString)
             defer { try? FileManager.default.removeItem(at: tmp) }
             do {
-                let (size, sha) = try await ResourceExporter.export(res, to: tmp)
+                let name = res.filename
+                let (size, sha) = try await ResourceExporter.export(res, to: tmp, allowICloud: allowICloud) { p in
+                    Task { @MainActor in self.current = "\(name)（從 iCloud 下載 \(Int(p * 100))%）" }
+                }
+                await MainActor.run { self.current = name }
                 let meta = UploadMeta(key: res.key, filename: res.filename, sha256: sha, size: size,
                                       created: res.created, assetId: res.assetId, resourceType: res.typeName)
                 try await uploadWithRetry(client: client, file: tmp, meta: meta)

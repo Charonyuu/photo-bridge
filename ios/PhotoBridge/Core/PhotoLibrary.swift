@@ -108,12 +108,15 @@ enum ResourceExporter {
         init(handle: FileHandle) { self.handle = handle }
     }
 
-    static func export(_ res: BackupResource, to url: URL) async throws -> (size: Int64, sha256: String) {
+    /// allowICloud = true 時，手機上沒有的原始檔會先從 iCloud 下載（較慢、要網路）
+    static func export(_ res: BackupResource, to url: URL, allowICloud: Bool = false,
+                       progress: (@Sendable (Double) -> Void)? = nil) async throws -> (size: Int64, sha256: String) {
         FileManager.default.createFile(atPath: url.path, contents: nil)
         let handle = try FileHandle(forWritingTo: url)
         let sink = Sink(handle: handle)
         let opts = PHAssetResourceRequestOptions()
-        opts.isNetworkAccessAllowed = false // 第一階段：不主動從 iCloud 下載
+        opts.isNetworkAccessAllowed = allowICloud
+        if allowICloud, let progress { opts.progressHandler = { p in progress(p) } }
 
         do {
             try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Void, Error>) in
@@ -132,7 +135,9 @@ enum ResourceExporter {
             }
         } catch {
             try? handle.close()
-            throw classify(error)
+            let e = classify(error)
+            if allowICloud, case ExportError.iCloudOnly = e { throw ExportError.read("iCloud 下載失敗，請確認網路後重試") }
+            throw e
         }
         try handle.close()
         if let w = sink.writeError { throw classify(w) }

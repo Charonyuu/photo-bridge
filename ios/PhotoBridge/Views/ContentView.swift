@@ -125,6 +125,7 @@ struct BackupView: View {
                 ProgressSegments(summary: shown, processed: engine.isBusy ? engine.processed : nil)
                 stats
                 actionButton
+                icloudToggle
                 statusText
                 if !problems.isEmpty {
                     NavigationLink { ProblemsView(problems: problems) } label: {
@@ -208,6 +209,18 @@ struct BackupView: View {
         }
     }
 
+    private var icloudToggle: some View {
+        Toggle(isOn: $engine.includeICloud) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("也從 iCloud 下載").font(.subheadline.weight(.medium))
+                Text("手機上沒有原始檔的照片，先從 iCloud 抓下來再傳。比較慢，會用到網路和一點手機空間，傳完就刪。")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+        }
+        .disabled(engine.isBusy)
+        .padding(14).background(Palette.panel, in: RoundedRectangle(cornerRadius: 12))
+    }
+
     @ViewBuilder private var statusText: some View {
         if case .failed(let msg) = engine.phase {
             Text(msg).font(.subheadline).foregroundStyle(Palette.bad)
@@ -229,8 +242,9 @@ struct BackupView: View {
             Text("說明").font(.footnote.weight(.semibold))
             Group {
                 Text("每個檔案傳完都用 SHA-256 比對，電腦收到的跟手機上的一模一樣才算「已備份」。")
-                Text("「只在 iCloud」是開了最佳化儲存空間、手機上沒有原始檔的項目，這版不會下載，不算備份成功。")
-                Text("備份時請讓 App 保持在畫面上。App 只讀取照片，不會刪除或修改手機和 iCloud 上的任何東西。")
+                Text("「只在 iCloud」是開了最佳化儲存空間、手機上沒有原始檔的項目，不算備份成功。打開「也從 iCloud 下載」再按一次就會補齊。")
+                Text("備份時請讓 App 保持在畫面上。想快一點：手機接上充電、關掉低耗電模式，電腦用網路線，手機連 5GHz Wi-Fi。")
+                Text("App 只讀取照片，不會刪除或修改手機和 iCloud 上的任何東西。")
             }
             .font(.footnote).foregroundStyle(.secondary)
         }
