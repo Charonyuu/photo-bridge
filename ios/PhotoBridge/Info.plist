@@ -46,6 +46,8 @@
 	<string>讀取照片與影片的原始檔，複製到你的電腦備份。App 不會刪除或修改任何照片。</string>
 	<key>UILaunchScreen</key>
 	<dict/>
+	<key>UIRequiresFullScreen</key>
+	<true/>
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>

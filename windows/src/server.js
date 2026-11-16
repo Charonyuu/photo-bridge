@@ -310,13 +310,9 @@ class App {
   }
 
   async staticFile(res, p) {
-    const pub = path.join(__dirname, '..', 'public');
-    const file = p === '/' ? 'index.html' : p.replace(/^\/+/, '');
-    const full = path.join(pub, file);
-    if (!full.startsWith(pub) || !fs.existsSync(full)) return send(res, 404, { error: 'not found' });
-    const type = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml' }[path.extname(full)] || 'application/octet-stream';
-    res.writeHead(200, { 'content-type': type, 'cache-control': 'no-store' });
-    fs.createReadStream(full).pipe(res);
+    if (p !== '/' && p !== '/index.html') return send(res, 404, { error: 'not found' });
+    res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' });
+    res.end(indexHtml());
   }
 
   listen() {
@@ -336,6 +332,17 @@ class App {
 }
 
 // ---------------- helpers ----------------
+// 打包成 exe 時介面內嵌在執行檔裡（node:sea asset），開發時讀 public/index.html
+let cachedHtml = null;
+function indexHtml() {
+  if (cachedHtml) return cachedHtml;
+  try {
+    const sea = require('node:sea');
+    if (sea.isSea()) return (cachedHtml = sea.getAsset('index.html', 'utf8'));
+  } catch {}
+  return fs.readFileSync(path.join(__dirname, '..', 'public', 'index.html'), 'utf8');
+}
+
 function receive(req, tmp) {
   return new Promise((resolve, reject) => {
     const h = crypto.createHash('sha256');
@@ -425,24 +432,25 @@ function openPath(p) {
 
 module.exports = { App, lanAddresses };
 
-if (require.main === module) {
-  (async () => {
-    const app = new App();
-    await app.init();
-    try {
-      await app.listen();
-    } catch (e) {
-      if (e.code === 'EADDRINUSE') {
-        console.log(`連接埠 ${app.port} 已被佔用，可能已經開著一個接收程式了。直接打開 http://localhost:${app.port}`);
-        openPath(`http://localhost:${app.port}`);
-        return;
-      }
-      throw e;
+async function main() {
+  const app = new App();
+  await app.init();
+  try {
+    await app.listen();
+  } catch (e) {
+    if (e.code === 'EADDRINUSE') {
+      console.log(`連接埠 ${app.port} 已被佔用，可能已經開著一個接收程式了。直接打開 http://localhost:${app.port}`);
+      openPath(`http://localhost:${app.port}`);
+      return;
     }
-    const url = `http://localhost:${app.port}`;
-    console.log(`PhotoBridge 接收程式已啟動：${url}`);
-    console.log(`區網位址：${lanAddresses().join(', ') || '(找不到，請確認有連上 Wi-Fi)'}`);
-    console.log('這個視窗關掉就會停止接收。');
-    if (!process.env.PHOTOBRIDGE_NO_OPEN) openPath(url);
-  })();
+    throw e;
+  }
+  const url = `http://localhost:${app.port}`;
+  console.log(`PhotoBridge 接收程式已啟動：${url}`);
+  console.log(`區網位址：${lanAddresses().join(', ') || '(找不到，請確認有連上 Wi-Fi)'}`);
+  console.log('這個視窗關掉就會停止接收。');
+  if (!process.env.PHOTOBRIDGE_NO_OPEN) openPath(url);
 }
+
+module.exports.main = main;
+if (require.main === module) main();

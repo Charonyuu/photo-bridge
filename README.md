@@ -7,10 +7,12 @@ iPhone → Windows 免費照片備份。同一個 Wi-Fi 直接傳，不經雲端
 
 ## 使用
 
-1. Windows：安裝 Node.js LTS，雙擊 `windows/start.bat`，瀏覽器會打開 `http://localhost:52765`。
-   第一次啟動 Windows 防火牆會詢問，請允許「私人網路」。
+1. Windows：雙擊 `PhotoBridge.exe`（不用裝 Node），瀏覽器會打開 `http://localhost:52765`。
+   - 出現「Windows 已保護您的電腦」：按「其他資訊 → 仍要執行」（exe 沒有程式碼簽章）。
+   - 防火牆詢問：允許「私人網路」，手機才連得進來。
+   - 開發時也可以裝 Node.js 後雙擊 `windows/start.bat`。
 2. 選備份資料夾。
-3. iPhone 打開「照片備份」，掃畫面上的 QR Code（用系統相機掃也可以），按「開始備份」。
+3. iPhone 從 TestFlight 安裝「照片備份」（不用開開發者模式），打開，掃畫面上的 QR Code（用系統相機掃也可以），按「開始備份」。
 4. 完成後看「已備份 / 失敗 / 只在 iCloud / 尚未備份」。再按一次「重新檢查並補傳」只會傳缺的。
 
 ## 怎麼保證完整
@@ -44,6 +46,10 @@ cd windows && npm install && npm test
 ```bash
 cd ios && xcodegen generate && open PhotoBridge.xcodeproj
 ```
+
+打包 exe（在 Windows 上，需要 Node 25.5+）：`powershell -ExecutionPolicy Bypass -File windows/build-exe.ps1` → `windows/dist/PhotoBridge.exe`。
+
+上傳 TestFlight：`xcodebuild archive -allowProvisioningUpdates` → `xcodebuild -exportArchive -exportOptionsPlist ios/ExportOptions.plist`（用 Xcode 登入的帳號，沙盒外跑）。App Store Connect App ID 6835513086，外部群組「PhotoBridge 公開測試」。
 
 模擬器測試：`xcrun simctl openurl booted "<電腦端 /ui/pair-url 的網址>"` 配對。
 

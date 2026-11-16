@@ -1,0 +1,7 @@
+{
+  "main": "dist/bundle.js",
+  "output": "dist/PhotoBridge.exe",
+  "disableExperimentalSEAWarning": true,
+  "useCodeCache": false,
+  "assets": { "index.html": "public/index.html" }
+}

@@ -193,7 +193,7 @@ final class BackupEngine: ObservableObject {
                 failure = error.localizedDescription
             }
         }
-        if skipped > 0 { await MainActor.run { self.skippedFiles += skipped } }
+        if skipped > 0 { let n = skipped; await MainActor.run { self.skippedFiles += n } }
         if let failure { await record(entry, .failed(failure)) }
         else if icloud { await record(entry, .icloud) }
         else { await record(entry, .done) }
