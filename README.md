@@ -5,6 +5,11 @@ iPhone → Windows 免費照片備份。同一個 Wi-Fi 直接傳，不經雲端
 - `windows/`：接收端（Node.js，零設定，瀏覽器操作介面）
 - `ios/`：iPhone App（SwiftUI + PhotoKit）
 
+## 下載
+
+- **Windows 接收程式**：[PhotoBridge-Windows.zip](https://github.com/Charonyuu/photo-bridge/releases/latest/download/PhotoBridge-Windows.zip)（解壓後雙擊 `PhotoBridge.exe`，不用裝 Node）
+- **iPhone App**：TestFlight <https://testflight.apple.com/join/RXRkM2PW>
+
 ## 使用
 
 1. Windows：雙擊 `PhotoBridge.exe`（不用裝 Node），瀏覽器會打開 `http://localhost:52765`。
