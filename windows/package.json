@@ -1,0 +1,15 @@
+{
+  "name": "photobridge-receiver",
+  "version": "0.1.0",
+  "private": true,
+  "description": "PhotoBridge Windows 接收端：iPhone 照片無線備份",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "test": "node --test test/server.test.js"
+  },
+  "engines": { "node": ">=18.15" },
+  "dependencies": {
+    "qrcode": "^1.5.4"
+  }
+}

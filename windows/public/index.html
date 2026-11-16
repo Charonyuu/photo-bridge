@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PhotoBridge 照片備份</title>
+<style>
+  :root {
+    --bg: #ffffff; --panel: #f6f7f9; --line: #e4e7ec; --text: #16181d; --muted: #667085;
+    --accent: #2563eb; --ok: #15803d; --bad: #c2410c; --cloud: #7c3aed; --wait: #64748b;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.6 "Microsoft JhengHei UI", "PingFang TC", system-ui, sans-serif; }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 28px 24px 60px; }
+  header { display: flex; align-items: center; gap: 12px; margin-bottom: 28px; }
+  header h1 { font-size: 20px; margin: 0; font-weight: 700; }
+  header .sub { color: var(--muted); font-size: 13px; margin-left: auto; }
+  .hero { display: grid; grid-template-columns: 300px 1fr; gap: 32px; align-items: center; padding: 28px; border: 1px solid var(--line); border-radius: 16px; }
+  .qr { width: 300px; height: 300px; border-radius: 12px; border: 1px solid var(--line); padding: 10px; background: #fff; }
+  .qr img { width: 100%; height: 100%; display: block; }
+  .step { font-size: 22px; font-weight: 700; margin: 0 0 8px; }
+  .muted { color: var(--muted); }
+  ol.how { padding-left: 20px; margin: 12px 0 0; color: var(--muted); }
+  button { font: inherit; border: 1px solid var(--line); background: #fff; color: var(--text); border-radius: 10px; padding: 9px 16px; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; }
+  button:hover { background: var(--panel); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; padding: 12px 22px; font-size: 16px; }
+  button.primary:hover { filter: brightness(1.05); background: var(--accent); }
+  button:disabled { opacity: .5; cursor: default; }
+  svg.i { width: 18px; height: 18px; flex: none; }
+  .folder { display: flex; align-items: center; gap: 10px; margin-top: 18px; padding: 12px 14px; background: var(--panel); border-radius: 10px; font-size: 14px; word-break: break-all; }
+  .folder .path { flex: 1; }
+  .section { margin-top: 28px; }
+  .section h2 { font-size: 16px; margin: 0 0 12px; }
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  .stat { border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
+  .stat .n { font-size: 28px; font-weight: 700; line-height: 1.2; font-variant-numeric: tabular-nums; }
+  .stat .l { font-size: 13px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+  .bar { height: 10px; border-radius: 5px; background: var(--panel); overflow: hidden; display: flex; margin: 14px 0 6px; }
+  .bar span { display: block; height: 100%; }
+  .live { display: flex; gap: 24px; flex-wrap: wrap; font-size: 14px; color: var(--muted); }
+  .live b { color: var(--text); font-variant-numeric: tabular-nums; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); }
+  th { color: var(--muted); font-weight: 500; }
+  .tag { font-size: 12px; padding: 2px 8px; border-radius: 99px; white-space: nowrap; }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  .events { font-size: 13px; color: var(--muted); max-height: 180px; overflow: auto; }
+  .events .error { color: var(--bad); }
+  .empty { padding: 18px; text-align: center; color: var(--muted); background: var(--panel); border-radius: 10px; font-size: 14px; }
+  .hidden { display: none !important; }
+  @media (max-width: 760px) { .hero { grid-template-columns: 1fr; } .qr { margin: 0 auto; } .stats { grid-template-columns: repeat(2, 1fr); } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <svg class="i" viewBox="0 0 24 24" style="width:28px;height:28px" fill="none" stroke="#2563eb" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2.5"/><circle cx="9" cy="10" r="1.8"/><path d="M21 15l-5-5-8 9"/></svg>
+    <h1>PhotoBridge 照片備份</h1>
+    <span class="sub" id="ver"></span>
+  </header>
+
+  <!-- 1. 還沒選資料夾 -->
+  <div class="hero hidden" id="needFolder">
+    <div class="qr" style="display:flex;align-items:center;justify-content:center;background:var(--panel);border:none">
+      <svg viewBox="0 0 120 100" width="160" fill="none" stroke="#98a2b3" stroke-width="3" stroke-linejoin="round"><path d="M10 25 h32 l8 10 h60 v55 h-100z"/><path d="M10 40 h100"/><path d="M60 58 v20 M50 68 l10 10 l10 -10" stroke="#2563eb"/></svg>
+    </div>
+    <div>
+      <p class="step">先選照片要放在哪裡</p>
+      <p class="muted">建議選外接硬碟或空間夠大的磁碟。照片會依拍攝年月分資料夾，原始檔完整保留，不會壓縮或轉檔。</p>
+      <div class="row" style="margin-top:18px">
+        <button class="primary" onclick="pick()"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7h6l2 2h10v10H3z"/></svg>選擇備份資料夾</button>
+      </div>
+      <div class="row" style="margin-top:12px">
+        <input id="manualPath" placeholder="或直接貼上路徑，例如 D:\iPhone備份" style="flex:1;min-width:220px;font:inherit;padding:9px 12px;border:1px solid var(--line);border-radius:10px">
+        <button onclick="setManual()">使用這個路徑</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. 配對 / 傳輸中 -->
+  <div class="hero hidden" id="pairing">
+    <div class="qr"><img id="qrImg" alt="配對 QR Code"></div>
+    <div>
+      <p class="step" id="heroTitle">用 iPhone 掃這個 QR Code</p>
+      <p class="muted" id="heroText">iPhone 和這台電腦要連同一個 Wi-Fi。</p>
+      <ol class="how" id="howList">
+        <li>打開 iPhone 上的 PhotoBridge，點「掃描電腦 QR Code」</li>
+        <li>配對好之後按「開始備份」</li>
+        <li>備份時讓 App 保持在前景、不要鎖定螢幕</li>
+      </ol>
+      <div class="folder">
+        <svg class="i" viewBox="0 0 24 24" fill="none" stroke="#667085" stroke-width="2"><path d="M3 7h6l2 2h10v10H3z"/></svg>
+        <span class="path" id="folderPath"></span>
+        <button onclick="post('/ui/open-folder')">開啟</button>
+        <button onclick="pick()">更換</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="section hidden" id="liveSec">
+    <h2>這次傳輸</h2>
+    <div class="live">
+      <span>手機：<b id="liveDevice">-</b></span>
+      <span>新收到：<b id="liveRecv">0</b> 個檔案</span>
+      <span>已有略過：<b id="liveSkip">0</b></span>
+      <span>傳輸失敗：<b id="liveFail">0</b></span>
+      <span>資料量：<b id="liveBytes">0</b></span>
+      <span id="liveNow"></span>
+    </div>
+  </div>
+
+  <div class="section hidden" id="phoneSec">
+    <h2 id="phoneTitle">手機圖庫備份狀態</h2>
+    <div class="stats">
+      <div class="stat"><div class="l"><span class="dot" style="background:var(--ok)"></span>已備份（已驗證）</div><div class="n" id="sDone">0</div></div>
+      <div class="stat"><div class="l"><span class="dot" style="background:var(--bad)"></span>失敗</div><div class="n" id="sFail">0</div></div>
+      <div class="stat"><div class="l"><span class="dot" style="background:var(--cloud)"></span>只在 iCloud</div><div class="n" id="sCloud">0</div></div>
+      <div class="stat"><div class="l"><span class="dot" style="background:var(--wait)"></span>尚未備份</div><div class="n" id="sPend">0</div></div>
+    </div>
+    <div class="bar" id="bar"></div>
+    <div class="muted" style="font-size:13px" id="phoneNote"></div>
+  </div>
+
+  <div class="section hidden" id="probSec">
+    <h2>還沒成功的項目 <span class="muted" style="font-weight:400;font-size:13px" id="probNote"></span></h2>
+    <table><thead><tr><th>狀態</th><th>檔名</th><th>拍攝時間</th><th>原因</th></tr></thead><tbody id="probBody"></tbody></table>
+  </div>
+
+  <div class="section hidden" id="diskSec">
+    <h2>電腦上的備份</h2>
+    <div class="row">
+      <span>已存 <b id="dCount">0</b> 個檔案，共 <b id="dBytes">0</b></span>
+      <button onclick="verify()" id="verifyBtn"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M8.5 12l2.5 2.5 4.5-5"/></svg>重新驗證所有檔案</button>
+      <span class="muted" id="verifyText" style="font-size:13px"></span>
+    </div>
+    <p class="muted" style="font-size:13px;margin:8px 0 0">驗證會重新讀取每個檔案算 SHA-256；不見或內容變動的檔案，手機下次備份時會自動補傳。</p>
+  </div>
+
+  <div class="section">
+    <h2>紀錄</h2>
+    <div class="events" id="events"></div>
+    <div class="row" style="margin-top:14px">
+      <button onclick="resetToken()">重設配對碼</button>
+      <span class="muted" style="font-size:13px" id="hosts"></span>
+    </div>
+  </div>
+</div>
+<script>
+const $ = (id) => document.getElementById(id);
+const fmt = (n) => Number(n || 0).toLocaleString('zh-TW');
+function bytes(n) { n = Number(n || 0); const u = ['B','KB','MB','GB','TB']; let i = 0; while (n >= 1024 && i < u.length - 1) { n /= 1024; i++; } return (i ? n.toFixed(1) : n) + ' ' + u[i]; }
+function esc(s) { return String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+async function post(url, body) {
+  const r = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body || {}) });
+  const j = await r.json(); if (!r.ok) alert(j.error || '失敗'); return j;
+}
+async function pick() { const j = await post('/ui/pick-folder'); if (j.cancelled) $('manualPath').focus(); refresh(); }
+async function setManual() { const p = $('manualPath').value.trim(); if (p) { await post('/ui/set-folder', { path: p }); refresh(); } }
+async function verify() { await post('/ui/verify'); refresh(); }
+async function resetToken() { if (confirm('重設後，手機要重新掃描 QR Code 才能連線。確定？')) { await post('/ui/reset-token'); $('qrImg').src = '/ui/qr?' + Date.now(); } }
+const tagStyle = { icloud: ['只在 iCloud', '#f3e8ff', '#7c3aed'], failed: ['失敗', '#ffedd5', '#c2410c'], pending: ['尚未備份', '#f1f5f9', '#475569'] };
+let qrLoaded = false;
+async function refresh() {
+  let s; try { s = await (await fetch('/ui/state')).json(); } catch { return; }
+  $('ver').textContent = `v${s.version} · ${s.name}`;
+  $('hosts').textContent = `電腦位址：${s.hosts.join('、') || '找不到網路'}，連接埠 ${s.port}`;
+  $('needFolder').classList.toggle('hidden', !!s.backupDir);
+  $('pairing').classList.toggle('hidden', !s.backupDir);
+  if (s.backupDir && !qrLoaded) { $('qrImg').src = '/ui/qr?' + Date.now(); qrLoaded = true; }
+  $('folderPath').textContent = s.backupDir || '';
+
+  const active = s.inFlight.length > 0;
+  const seenRecently = s.session.lastSeen && Date.now() - new Date(s.session.lastSeen) < 15000;
+  if (active || seenRecently) {
+    $('heroTitle').textContent = active ? '正在接收照片' : '手機已連線';
+    $('heroText').textContent = `${s.session.device || 'iPhone'} 已配對。傳輸期間這個視窗請保持開啟。`;
+    $('howList').classList.add('hidden');
+  } else {
+    $('heroTitle').textContent = '用 iPhone 掃這個 QR Code';
+    $('heroText').textContent = 'iPhone 和這台電腦要連同一個 Wi-Fi。';
+    $('howList').classList.remove('hidden');
+  }
+
+  const ses = s.session;
+  $('liveSec').classList.toggle('hidden', !ses.startedAt);
+  $('liveDevice').textContent = ses.device || '-';
+  $('liveRecv').textContent = fmt(ses.received);
+  $('liveSkip').textContent = fmt(ses.skipped);
+  $('liveFail').textContent = fmt(ses.failed);
+  $('liveBytes').textContent = bytes(ses.bytes);
+  $('liveNow').innerHTML = active ? `正在收：<b>${esc(s.inFlight.join('、'))}</b>` : '';
+
+  const ph = s.phone;
+  $('phoneSec').classList.toggle('hidden', !ph);
+  if (ph) {
+    const m = ph.summary || {};
+    $('sDone').textContent = fmt(m.done); $('sFail').textContent = fmt(m.failed);
+    $('sCloud').textContent = fmt(m.icloud); $('sPend').textContent = fmt(m.pending);
+    const total = m.total || 1;
+    $('bar').innerHTML = [['done','--ok'],['failed','--bad'],['icloud','--cloud'],['pending','--wait']]
+      .map(([k, c]) => `<span style="width:${(m[k] || 0) / total * 100}%;background:var(${c});opacity:${k==='pending'?0.25:1}"></span>`).join('');
+    $('phoneTitle').textContent = ph.final ? '手機圖庫備份狀態（上次完成）' : '手機圖庫備份狀態（進行中）';
+    $('phoneNote').textContent = `以「照片／影片項目」計算，共 ${fmt(m.total)} 項（${fmt(m.files)} 個原始檔）。` +
+      (ph.limitedAccess ? ' 注意：手機只開放部分照片給 App，沒開放的不會被備份。' : '') +
+      ` 更新時間 ${new Date(ph.receivedAt).toLocaleString('zh-TW')}`;
+  }
+  $('probSec').classList.toggle('hidden', !s.problems.length);
+  $('probNote').textContent = ph && ph.problemCount > s.problems.length ? `（只列前 ${s.problems.length} 筆，完整清單在備份資料夾的「未完成備份清單.csv」）` : '（完整清單也存在備份資料夾的「未完成備份清單.csv」）';
+  $('probBody').innerHTML = s.problems.map((p) => {
+    const [l, bg, fg] = tagStyle[p.status] || [p.status, '#eee', '#333'];
+    return `<tr><td><span class="tag" style="background:${bg};color:${fg}">${l}</span></td><td>${esc(p.filename)}</td><td>${p.created ? new Date(p.created).toLocaleString('zh-TW') : ''}</td><td class="muted">${esc(p.reason)}</td></tr>`;
+  }).join('');
+
+  $('diskSec').classList.toggle('hidden', !s.stored);
+  if (s.stored) { $('dCount').textContent = fmt(s.stored.count); $('dBytes').textContent = bytes(s.stored.bytes); }
+  const v = s.verify;
+  $('verifyBtn').disabled = !!(v && v.running);
+  $('verifyText').textContent = !v ? '' : v.running ? `驗證中 ${fmt(v.checked)} / ${fmt(v.total)}` : `上次驗證：正常 ${fmt(v.ok)}、不見 ${fmt(v.missing)}、損毀 ${fmt(v.corrupt)}`;
+  $('events').innerHTML = s.events.length ? s.events.map((e) => `<div class="${e.level}">${new Date(e.at).toLocaleTimeString('zh-TW')}　${esc(e.msg)}</div>`).join('') : '<div class="empty">還沒有紀錄</div>';
+}
+refresh(); setInterval(refresh, 1500);
+</script>
+</body>
+</html>

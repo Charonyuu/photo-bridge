@@ -1,0 +1,45 @@
+name: PhotoBridge
+options:
+  bundleIdPrefix: com.charonyuu
+  deploymentTarget:
+    iOS: "16.0"
+  createIntermediateGroups: true
+  developmentLanguage: zh-Hant
+
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    TARGETED_DEVICE_FAMILY: "1"
+    CODE_SIGN_STYLE: Automatic
+    DEVELOPMENT_TEAM: XADL3RD65Y
+
+targets:
+  PhotoBridge:
+    type: application
+    platform: iOS
+    sources:
+      - path: PhotoBridge
+    info:
+      path: PhotoBridge/Info.plist
+      properties:
+        CFBundleDisplayName: 照片備份
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleDevelopmentRegion: zh-Hant
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        ITSAppUsesNonExemptEncryption: false
+        NSPhotoLibraryUsageDescription: 讀取照片與影片的原始檔，複製到你的電腦備份。App 不會刪除或修改任何照片。
+        NSCameraUsageDescription: 掃描電腦接收程式上的配對 QR Code。
+        NSLocalNetworkUsageDescription: 在同一個 Wi-Fi 下把照片直接傳到你的電腦。
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
+        CFBundleURLTypes:
+          - CFBundleURLName: com.charonyuu.photobridge.pair
+            CFBundleURLSchemes: [photobridge]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.charonyuu.photobridge
+        GENERATE_INFOPLIST_FILE: NO
